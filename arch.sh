@@ -113,50 +113,50 @@ else
     SDDM_PKGS=""
 fi
 
-mkdir -p /mnt/tmp
-echo "$TIMEZONE" > /mnt/tmp/timezone
-echo "$HOSTNAME" > /mnt/tmp/hostname
-echo "$USERNAME" > /mnt/tmp/username
-echo "$PASSWORD" > /mnt/tmp/userpass
-echo "$ROOTPASS" > /mnt/tmp/rootpass
-echo "$COUNTRY" > /mnt/tmp/country
-echo "$HYPR_PKGS" > /mnt/tmp/hyprpkgs
-echo "$SDDM_PKGS" > /mnt/tmp/sddmpkgs
-echo "$NVIDIA_PKGS" > /mnt/tmp/nvidiapkgs
+mkdir -p /mnt/root
+echo "$TIMEZONE" > /mnt/root/tmp_timezone
+echo "$HOSTNAME" > /mnt/root/tmp_hostname
+echo "$USERNAME" > /mnt/root/tmp_username
+echo "$PASSWORD" > /mnt/root/tmp_userpass
+echo "$ROOTPASS" > /mnt/root/tmp_rootpass
+echo "$COUNTRY" > /mnt/root/tmp_country
+echo "$HYPR_PKGS" > /mnt/root/tmp_hyprpkgs
+echo "$SDDM_PKGS" > /mnt/root/tmp_sddmpkgs
+echo "$NVIDIA_PKGS" > /mnt/root/tmp_nvidiapkgs
 
 retry "arch-chroot /mnt /bin/bash -e" <<'CHROOT'
 set -e
-ln -sf /usr/share/zoneinfo/$(cat /tmp/timezone) /etc/localtime
+ln -sf /usr/share/zoneinfo/$(cat /root/tmp_timezone) /etc/localtime
 hwclock --systohc
 sed -i 's/#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
 locale-gen
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
-echo "$(cat /tmp/hostname)" > /etc/hostname
+echo "$(cat /root/tmp_hostname)" > /etc/hostname
 cat <<H >> /etc/hosts
 127.0.0.1   localhost
 ::1         localhost
-127.0.1.1   $(cat /tmp/hostname).localdomain $(cat /tmp/hostname)
+127.0.1.1   $(cat /root/tmp_hostname).localdomain $(cat /root/tmp_hostname)
 H
-echo "root:$(cat /tmp/rootpass)" | chpasswd
-useradd -m -G wheel,video,audio,input -s /bin/bash $(cat /tmp/username)
-echo "$(cat /tmp/username):$(cat /tmp/userpass)" | chpasswd
+echo "root:$(cat /root/tmp_rootpass)" | chpasswd
+useradd -m -G wheel,video,audio,input -s /bin/bash $(cat /root/tmp_username)
+echo "$(cat /root/tmp_username):$(cat /root/tmp_userpass)" | chpasswd
 echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/wheel
 sed -i '/\[multilib\]/,/Include/ s/^#//' /etc/pacman.conf
 pacman -Sy --noconfirm
-if command -v reflector >/dev/null 2>&1; then reflector --country "$(cat /tmp/country)" --protocol http,https --sort rate --latest 10 --save /etc/pacman.d/mirrorlist || true; fi
-pacman -S --noconfirm $(cat /tmp/hyprpkgs) $(cat /tmp/sddmpkgs) kitty neovim nano nautilus noto-fonts noto-fonts-cjk noto-fonts-emoji noto-fonts-extra ttf-dejavu ttf-font-awesome $(cat /tmp/nvidiapkgs)
-if [[ -n "$(cat /tmp/nvidiapkgs)" ]]; then echo "options nvidia_drm modeset=1" > /etc/modprobe.d/nvidia.conf; mkinitcpio -P; fi
+if command -v reflector >/dev/null 2>&1; then reflector --country "$(cat /root/tmp_country)" --protocol http,https --sort rate --latest 10 --save /etc/pacman.d/mirrorlist || true; fi
+pacman -S --noconfirm $(cat /root/tmp_hyprpkgs) $(cat /root/tmp_sddmpkgs) kitty neovim nano nautilus noto-fonts noto-fonts-cjk noto-fonts-emoji noto-fonts-extra ttf-dejavu ttf-font-awesome $(cat /root/tmp_nvidiapkgs)
+if [[ -n "$(cat /root/tmp_nvidiapkgs)" ]]; then echo "options nvidia_drm modeset=1" > /etc/modprobe.d/nvidia.conf; mkinitcpio -P; fi
 echo "alias vim='nvim'" >> /etc/bash.bashrc
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
 grub-mkconfig -o /boot/grub/grub.cfg
 systemctl enable NetworkManager
-if [[ -n "$(cat /tmp/sddmpkgs)" ]]; then systemctl enable sddm.service; fi
-sudo -u $(cat /tmp/username) bash -c '
+if [[ -n "$(cat /root/tmp_sddmpkgs)" ]]; then systemctl enable sddm.service; fi
+sudo -u $(cat /root/tmp_username) bash -c '
 cd ~
 git clone https://aur.archlinux.org/yay-bin.git
 cd yay-bin
 makepkg -si --noconfirm
-if [[ -n "$(cat /tmp/hyprpkgs)" ]]; then yay -S --noconfirm brave-bin; fi
+if [[ -n "$(cat /root/tmp_hyprpkgs)" ]]; then yay -S --noconfirm brave-bin; fi
 '
 CHROOT
 

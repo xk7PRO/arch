@@ -144,20 +144,34 @@ echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/wheel
 sed -i '/\[multilib\]/,/Include/ s/^#//' /etc/pacman.conf
 pacman -Sy --noconfirm
 if command -v reflector >/dev/null 2>&1; then reflector --country "$(cat /root/tmp_country)" --protocol http,https --sort rate --latest 10 --save /etc/pacman.d/mirrorlist || true; fi
-pacman -S --noconfirm $(cat /root/tmp_hyprpkgs) $(cat /root/tmp_sddmpkgs) kitty neovim nano nautilus noto-fonts noto-fonts-cjk noto-fonts-emoji noto-fonts-extra ttf-dejavu ttf-font-awesome $(cat /root/tmp_nvidiapkgs)
-if [[ -n "$(cat /root/tmp_nvidiapkgs)" ]]; then echo "options nvidia_drm modeset=1" > /etc/modprobe.d/nvidia.conf; mkinitcpio -P; fi
+
+PKGS="kitty neovim nano nautilus noto-fonts noto-fonts-cjk noto-fonts-emoji noto-fonts-extra ttf-dejavu ttf-font-awesome"
+HYPR=$(cat /root/tmp_hyprpkgs)
+SDDM=$(cat /root/tmp_sddmpkgs)
+NVIDIA=$(cat /root/tmp_nvidiapkgs)
+[[ -n "\$HYPR" ]] && PKGS+=" \$HYPR"
+[[ -n "\$SDDM" ]] && PKGS+=" \$SDDM"
+[[ -n "\$NVIDIA" ]] && PKGS+=" \$NVIDIA"
+
+pacman -S --noconfirm \$PKGS
+
+if [[ -n "\$NVIDIA" ]]; then echo "options nvidia_drm modeset=1" > /etc/modprobe.d/nvidia.conf; mkinitcpio -P; fi
 echo "alias vim='nvim'" >> /etc/bash.bashrc
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
 grub-mkconfig -o /boot/grub/grub.cfg
 systemctl enable NetworkManager
-if [[ -n "$(cat /root/tmp_sddmpkgs)" ]]; then systemctl enable sddm.service; fi
-sudo -u $(cat /root/tmp_username) bash -c '
-cd ~
-git clone https://aur.archlinux.org/yay-bin.git
-cd yay-bin
-makepkg -si --noconfirm
-if [[ -n "$(cat /root/tmp_hyprpkgs)" ]]; then yay -S --noconfirm brave-bin; fi
-'
+[[ -n "\$SDDM" ]] && systemctl enable sddm.service
+
+HYPR=$(cat /root/tmp_hyprpkgs)
+if [[ -n "\$HYPR" ]]; then
+    sudo -u $(cat /root/tmp_username) bash -c '
+    cd ~
+    git clone https://aur.archlinux.org/yay-bin.git
+    cd yay-bin
+    makepkg -si --noconfirm
+    yay -S --noconfirm brave-bin
+    '
+fi
 CHROOT
 
 echo "Run: umount -R /mnt && swapoff -a && reboot"

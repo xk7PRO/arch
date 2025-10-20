@@ -89,29 +89,8 @@ retry "mkdir -p /mnt/boot"
 retry "mount \"$BOOT\" /mnt/boot"
 if [[ -n "$SWAP" ]]; then retry "mkswap \"$SWAP\""; retry "swapon \"$SWAP\""; fi
 
-retry "pacstrap /mnt base linux linux-firmware vim nano networkmanager grub efibootmgr sudo git base-devel python reflector curl bc"
+retry "pacstrap /mnt base linux linux-firmware vim nano networkmanager grub efibootmgr sudo git python reflector curl bc"
 retry "genfstab -U /mnt >> /mnt/etc/fstab"
-
-read -rp "Install NVIDIA drivers? [y/N]: " INSTALL_NVIDIA
-if [[ "$INSTALL_NVIDIA" =~ ^[Yy]$ ]]; then
-    NVIDIA_PKGS="nvidia-dkms nvidia-utils lib32-nvidia-utils egl-wayland"
-else
-    NVIDIA_PKGS=""
-fi
-
-read -rp "Install Hyprland (Wayland compositor)? [y/N]: " INSTALL_HYPR
-if [[ "$INSTALL_HYPR" =~ ^[Yy]$ ]]; then
-    HYPR_PKGS="hyprland"
-else
-    HYPR_PKGS=""
-fi
-
-read -rp "Install SDDM (login manager)? [y/N]: " INSTALL_SDDM
-if [[ "$INSTALL_SDDM" =~ ^[Yy]$ ]]; then
-    SDDM_PKGS="sddm"
-else
-    SDDM_PKGS=""
-fi
 
 mkdir -p /mnt/root
 echo "$TIMEZONE" > /mnt/root/tmp_timezone
@@ -120,9 +99,6 @@ echo "$USERNAME" > /mnt/root/tmp_username
 echo "$PASSWORD" > /mnt/root/tmp_userpass
 echo "$ROOTPASS" > /mnt/root/tmp_rootpass
 echo "$COUNTRY" > /mnt/root/tmp_country
-echo "$HYPR_PKGS" > /mnt/root/tmp_hyprpkgs
-echo "$SDDM_PKGS" > /mnt/root/tmp_sddmpkgs
-echo "$NVIDIA_PKGS" > /mnt/root/tmp_nvidiapkgs
 
 retry "arch-chroot /mnt /bin/bash -e" <<'CHROOT'
 set -e
@@ -138,40 +114,16 @@ cat <<H >> /etc/hosts
 127.0.1.1   $(cat /root/tmp_hostname).localdomain $(cat /root/tmp_hostname)
 H
 echo "root:$(cat /root/tmp_rootpass)" | chpasswd
-useradd -m -G wheel,video,audio,input -s /bin/bash $(cat /root/tmp_username)
+useradd -m -G wheel,audio,video,input -s /bin/bash $(cat /root/tmp_username)
 echo "$(cat /root/tmp_username):$(cat /root/tmp_userpass)" | chpasswd
 echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/wheel
 sed -i '/\[multilib\]/,/Include/ s/^#//' /etc/pacman.conf
 pacman -Sy --noconfirm
 if command -v reflector >/dev/null 2>&1; then reflector --country "$(cat /root/tmp_country)" --protocol http,https --sort rate --latest 10 --save /etc/pacman.d/mirrorlist || true; fi
-
-PKGS="kitty neovim nano nautilus noto-fonts noto-fonts-cjk noto-fonts-emoji noto-fonts-extra ttf-dejavu ttf-font-awesome"
-HYPR=$(cat /root/tmp_hyprpkgs)
-SDDM=$(cat /root/tmp_sddmpkgs)
-NVIDIA=$(cat /root/tmp_nvidiapkgs)
-[[ -n "\$HYPR" ]] && PKGS+=" \$HYPR"
-[[ -n "\$SDDM" ]] && PKGS+=" \$SDDM"
-[[ -n "\$NVIDIA" ]] && PKGS+=" \$NVIDIA"
-
-pacman -S --noconfirm \$PKGS
-
-if [[ -n "\$NVIDIA" ]]; then echo "options nvidia_drm modeset=1" > /etc/modprobe.d/nvidia.conf; mkinitcpio -P; fi
-echo "alias vim='nvim'" >> /etc/bash.bashrc
+echo "alias vim='nano'" >> /etc/bash.bashrc
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
 grub-mkconfig -o /boot/grub/grub.cfg
 systemctl enable NetworkManager
-[[ -n "\$SDDM" ]] && systemctl enable sddm.service
-
-HYPR=$(cat /root/tmp_hyprpkgs)
-if [[ -n "\$HYPR" ]]; then
-    sudo -u $(cat /root/tmp_username) bash -c '
-    cd ~
-    git clone https://aur.archlinux.org/yay-bin.git
-    cd yay-bin
-    makepkg -si --noconfirm
-    yay -S --noconfirm brave-bin
-    '
-fi
 CHROOT
 
 echo "Run: umount -R /mnt && swapoff -a && reboot"

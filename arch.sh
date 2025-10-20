@@ -89,7 +89,7 @@ retry "mkdir -p /mnt/boot"
 retry "mount \"$BOOT\" /mnt/boot"
 if [[ -n "$SWAP" ]]; then retry "mkswap \"$SWAP\""; retry "swapon \"$SWAP\""; fi
 
-retry "pacstrap /mnt base linux linux-firmware vim nano networkmanager grub efibootmgr sudo git python reflector curl bc"
+retry "pacstrap /mnt base linux linux-firmware vim nano networkmanager grub efibootmgr sudo python reflector curl bc"
 retry "genfstab -U /mnt >> /mnt/etc/fstab"
 
 mkdir -p /mnt/root
@@ -118,12 +118,19 @@ useradd -m -G wheel,audio,video,input -s /bin/bash $(cat /root/tmp_username)
 echo "$(cat /root/tmp_username):$(cat /root/tmp_userpass)" | chpasswd
 echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/wheel
 sed -i '/\[multilib\]/,/Include/ s/^#//' /etc/pacman.conf
-pacman -Sy --noconfirm
-if command -v reflector >/dev/null 2>&1; then reflector --country "$(cat /root/tmp_country)" --protocol http,https --sort rate --latest 10 --save /etc/pacman.d/mirrorlist || true; fi
-echo "alias vim='nano'" >> /etc/bash.bashrc
+pacman -Sy --noconfirm git
+cd /root
+git clone https://github.com/xk7PRO/arch
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
 grub-mkconfig -o /boot/grub/grub.cfg
 systemctl enable NetworkManager
+
+read -rp "Install Hyprland? [y/N]: " HYPR
+if [[ "\$HYPR" =~ ^[Yy]$ ]]; then bash /root/arch/hypr.sh; fi
+read -rp "Install NVIDIA drivers? [y/N]: " NVIDIA
+if [[ "\$NVIDIA" =~ ^[Yy]$ ]]; then bash /root/arch/nvidia.sh; fi
+read -rp "Install SDDM? [y/N]: " SDDM
+if [[ "\$SDDM" =~ ^[Yy]$ ]]; then bash /root/arch/sddm.sh; fi
 CHROOT
 
 echo "Run: umount -R /mnt && swapoff -a && reboot"

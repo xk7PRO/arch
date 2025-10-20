@@ -14,7 +14,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
 
 retry() {
     local cmd="$1"
-    until $cmd; do
+    until bash -c "$cmd"; do
         echo "Command failed: $cmd"
         read -rp "Retry? [y/N]: " retry
         [[ "$retry" =~ ^[Yy]$ ]] || return 1

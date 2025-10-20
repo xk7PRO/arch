@@ -35,6 +35,10 @@ fi
 COUNTRY=${COUNTRY^^}
 COUNTRY=${COUNTRY:-WORLDWIDE}
 
+read -rp "Install Hyprland? [y/N]: " INSTALL_HYPR
+read -rp "Install NVIDIA drivers? [y/N]: " INSTALL_NVIDIA
+read -rp "Install SDDM? [y/N]: " INSTALL_SDDM
+
 retry "pacman -Sy --noconfirm python reflector curl bc || true"
 if [[ "$COUNTRY" != "WORLDWIDE" ]]; then
     if ! reflector --country "$COUNTRY" --protocol http,https --sort rate --latest 10 --save /etc/pacman.d/mirrorlist; then
@@ -99,6 +103,9 @@ echo "$USERNAME" > /mnt/root/tmp_username
 echo "$PASSWORD" > /mnt/root/tmp_userpass
 echo "$ROOTPASS" > /mnt/root/tmp_rootpass
 echo "$COUNTRY" > /mnt/root/tmp_country
+echo "$INSTALL_HYPR" > /mnt/root/tmp_hypr
+echo "$INSTALL_NVIDIA" > /mnt/root/tmp_nvidia
+echo "$INSTALL_SDDM" > /mnt/root/tmp_sddm
 
 retry "arch-chroot /mnt /bin/bash -e" <<'CHROOT'
 set -e
@@ -125,12 +132,9 @@ grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
 grub-mkconfig -o /boot/grub/grub.cfg
 systemctl enable NetworkManager
 
-read -rp "Install Hyprland? [y/N]: " HYPR
-if [[ "\$HYPR" =~ ^[Yy]$ ]]; then bash /root/arch/hypr.sh; fi
-read -rp "Install NVIDIA drivers? [y/N]: " NVIDIA
-if [[ "\$NVIDIA" =~ ^[Yy]$ ]]; then bash /root/arch/nvidia.sh; fi
-read -rp "Install SDDM? [y/N]: " SDDM
-if [[ "\$SDDM" =~ ^[Yy]$ ]]; then bash /root/arch/sddm.sh; fi
+if [[ "$(cat /root/tmp_hypr)" =~ ^[Yy]$ ]]; then bash /root/arch/hypr.sh; fi
+if [[ "$(cat /root/tmp_nvidia)" =~ ^[Yy]$ ]]; then bash /root/arch/nvidia.sh; fi
+if [[ "$(cat /root/tmp_sddm)" =~ ^[Yy]$ ]]; then bash /root/arch/sddm.sh; fi
 CHROOT
 
 echo "Run: umount -R /mnt && swapoff -a && reboot"

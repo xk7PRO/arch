@@ -93,7 +93,7 @@ retry "mkdir -p /mnt/boot"
 retry "mount \"$BOOT\" /mnt/boot"
 if [[ -n "$SWAP" ]]; then retry "mkswap \"$SWAP\""; retry "swapon \"$SWAP\""; fi
 
-retry "pacstrap /mnt base linux linux-firmware vim nano networkmanager grub efibootmgr sudo python reflector curl bc"
+retry "pacstrap /mnt base linux linux-firmware linux-headers vim nano networkmanager grub efibootmgr sudo python reflector curl bc"
 retry "genfstab -U /mnt >> /mnt/etc/fstab"
 
 mkdir -p /mnt/root

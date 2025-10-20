@@ -38,24 +38,35 @@ Server = https://mirror.pit.teraswitch.com/archlinux/$repo/os/$arch
 EOF
 fi
 
+read -rp "Create swap partition (4GB)? [y/N]: " CREATE_SWAP
+
 parted -s "$DISK" mklabel gpt
 parted -s "$DISK" mkpart ESP fat32 1MiB 1025MiB
 parted -s "$DISK" set 1 boot on
-parted -s "$DISK" mkpart primary linux-swap 1025MiB 5121MiB
-parted -s "$DISK" mkpart primary ext4 5121MiB 100%
+
+if [[ "$CREATE_SWAP" =~ ^[Yy]$ ]]; then
+    parted -s "$DISK" mkpart primary linux-swap 1025MiB 5121MiB
+    parted -s "$DISK" mkpart primary ext4 5121MiB 100%
+    SWAP="${DISK}2"
+    ROOT="${DISK}3"
+else
+    parted -s "$DISK" mkpart primary ext4 1025MiB 100%
+    SWAP=""
+    ROOT="${DISK}2"
+fi
 
 BOOT="${DISK}1"
-SWAP="${DISK}2"
-ROOT="${DISK}3"
 
 mkfs.fat -F32 "$BOOT"
-mkswap "$SWAP"
 mkfs.ext4 -F "$ROOT"
-
 mount "$ROOT" /mnt
 mkdir -p /mnt/boot
 mount "$BOOT" /mnt/boot
-swapon "$SWAP"
+
+if [[ -n "$SWAP" ]]; then
+    mkswap "$SWAP"
+    swapon "$SWAP"
+fi
 
 pacstrap /mnt base linux linux-firmware vim nano networkmanager grub efibootmgr sudo git base-devel python reflector curl
 genfstab -U /mnt >> /mnt/etc/fstab
@@ -65,6 +76,20 @@ if [[ "$INSTALL_NVIDIA" =~ ^[Yy]$ ]]; then
     NVIDIA_PKGS="nvidia-dkms nvidia-utils lib32-nvidia-utils egl-wayland"
 else
     NVIDIA_PKGS=""
+fi
+
+read -rp "Install Hyprland (Wayland compositor)? [y/N]: " INSTALL_HYPR
+if [[ "$INSTALL_HYPR" =~ ^[Yy]$ ]]; then
+    HYPR_PKGS="hyprland"
+else
+    HYPR_PKGS=""
+fi
+
+read -rp "Install SDDM (login manager)? [y/N]: " INSTALL_SDDM
+if [[ "$INSTALL_SDDM" =~ ^[Yy]$ ]]; then
+    SDDM_PKGS="sddm"
+else
+    SDDM_PKGS=""
 fi
 
 arch-chroot /mnt /bin/bash <<EOF
@@ -90,12 +115,9 @@ echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/wheel
 
 sed -i '/\[multilib\]/,/Include/ s/^#//' /etc/pacman.conf
 pacman -Sy --noconfirm
+if command -v reflector >/dev/null 2>&1; then reflector --country "$COUNTRY" --protocol https --sort rate --latest 10 --save /etc/pacman.d/mirrorlist || true; fi
 
-if command -v reflector >/dev/null 2>&1; then
-    reflector --country "$COUNTRY" --protocol https --sort rate --latest 10 --save /etc/pacman.d/mirrorlist || true
-fi
-
-pacman -S --noconfirm hyprland sddm kitty neovim nano nautilus noto-fonts noto-fonts-cjk noto-fonts-emoji noto-fonts-extra ttf-dejavu ttf-font-awesome ${NVIDIA_PKGS}
+pacman -S --noconfirm ${HYPR_PKGS} ${SDDM_PKGS} kitty neovim nano nautilus noto-fonts noto-fonts-cjk noto-fonts-emoji noto-fonts-extra ttf-dejavu ttf-font-awesome ${NVIDIA_PKGS}
 
 if [[ -n "${NVIDIA_PKGS}" ]]; then
     echo "options nvidia_drm modeset=1" > /etc/modprobe.d/nvidia.conf
@@ -107,7 +129,7 @@ echo "alias vim='nvim'" >> /etc/bash.bashrc
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
 grub-mkconfig -o /boot/grub/grub.cfg
 systemctl enable NetworkManager
-systemctl enable sddm.service
+if [[ -n "${SDDM_PKGS}" ]]; then systemctl enable sddm.service; fi
 
 sudo -u $USERNAME bash <<Y
 cd /home/$USERNAME
@@ -118,4 +140,4 @@ yay -S --noconfirm brave-bin
 Y
 EOF
 
-echo "Run: umount -R /mnt && swapoff $SWAP && reboot"
+echo "Run: umount -R /mnt && swapoff -a && reboot"

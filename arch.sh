@@ -9,9 +9,6 @@ if grep -q $'\r' "$0"; then
     exec "$0" "$@"
 fi
 
-LOGFILE="$(dirname "$0")/arch_install_$(date +%Y%m%d_%H%M%S).log"
-exec > >(tee -a "$LOGFILE") 2>&1
-
 retry() {
     local cmd="$1"
     until bash -c "$cmd"; do
@@ -153,4 +150,3 @@ Y
 EOF"
 
 echo "Run: umount -R /mnt && swapoff -a && reboot"
-echo "Log saved to: $LOGFILE"

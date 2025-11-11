@@ -73,18 +73,28 @@ retry "parted -s \"$DISK\" mklabel gpt"
 retry "parted -s \"$DISK\" mkpart ESP fat32 1MiB 1025MiB"
 retry "parted -s \"$DISK\" set 1 boot on"
 
+if [[ "$DISK" == *"nvme"* ]]; then
+    P1="${DISK}p1"
+    P2="${DISK}p2"
+    P3="${DISK}p3"
+else
+    P1="${DISK}1"
+    P2="${DISK}2"
+    P3="${DISK}3"
+fi
+
 if (( $(echo "$SWAP_SIZE > 0" | bc -l) )); then
     retry "parted -s \"$DISK\" mkpart primary linux-swap 1025MiB ${SWAP_END}MiB"
     retry "parted -s \"$DISK\" mkpart primary ext4 ${SWAP_END}MiB 100%"
-    SWAP="${DISK}2"
-    ROOT="${DISK}3"
+    SWAP="$P2"
+    ROOT="$P3"
 else
     retry "parted -s \"$DISK\" mkpart primary ext4 1025MiB 100%"
     SWAP=""
-    ROOT="${DISK}2"
+    ROOT="$P2"
 fi
 
-BOOT="${DISK}1"
+BOOT="$P1"
 
 retry "mkfs.fat -F32 \"$BOOT\""
 retry "mkfs.ext4 -F \"$ROOT\""

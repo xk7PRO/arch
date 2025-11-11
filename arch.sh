@@ -138,6 +138,7 @@ sed -i '/\[multilib\]/,/Include/ s/^#//' /etc/pacman.conf
 pacman -Sy --noconfirm git
 cd /root
 git clone https://github.com/xk7PRO/arch
+echo "KEYMAP=us" > /etc/vconsole.conf
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
 grub-mkconfig -o /boot/grub/grub.cfg
 systemctl enable NetworkManager
